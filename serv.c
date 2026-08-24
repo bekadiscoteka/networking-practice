@@ -48,7 +48,7 @@ int main(void) {
 	memset( &hints, 0, sizeof hints );
 	
 	int status;
-	if (status = getaddrinfo(NULL, PORT, &hints, &res) != 0) {
+	if ( (status = getaddrinfo(NULL, PORT, &hints, &res)) != 0) {
 		fprintf(stderr, "addr error: %s", gai_strerror(status));
 		return 1;
 	}
@@ -106,18 +106,21 @@ int main(void) {
 
 	int newfd;
 	struct sockaddr_storage theiraddr;
+	socklen_t theiraddr_len = sizeof(theiraddr);
 
 
-	printf("waiting for connection...");
 
 	while (1) {
-		if ( (newfd = accept( sockfd, (struct sockaddr*) &theiraddr, sizeof(theiraddr) )) == -1 ) {
+
+		printf("waiting for connection...");
+
+		if ( (newfd = accept( sockfd, (struct sockaddr*) &theiraddr, &theiraddr_len )) == -1 ) {
 			perror("server accept");
 			continue;
 		}
 
 		
-		getpeername( newfd, (struct sockaddr *) &theiraddr, sizeof(theiraddr) );
+		getpeername( newfd, (struct sockaddr *) &theiraddr, &theiraddr_len );
 		char theiraddr_char[INET6_ADDRSTRLEN];
 		if (inet_ntop(theiraddr.ss_family, get_in_addr(&theiraddr), theiraddr_char, INET6_ADDRSTRLEN) == NULL) {
 			fprintf(stderr, "inet_ntop() fail");	
