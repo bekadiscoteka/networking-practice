@@ -39,13 +39,13 @@ int main(void) {
 		perror("server: gethostname");
 		exit(1);
 	}
-	printf("HOST: %s", hostname);
+	printf("HOST: %s\n", hostname);
 
 	struct addrinfo hints, *res;
+	memset( &hints, 0, sizeof hints );
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-	memset( &hints, 0, sizeof hints );
 	
 	int status;
 	if ( (status = getaddrinfo(NULL, PORT, &hints, &res)) != 0) {
@@ -108,11 +108,11 @@ int main(void) {
 	struct sockaddr_storage theiraddr;
 	socklen_t theiraddr_len = sizeof(theiraddr);
 
+	printf("waiting for connection...\n");
 
 
 	while (1) {
 
-		printf("waiting for connection...");
 
 		if ( (newfd = accept( sockfd, (struct sockaddr*) &theiraddr, &theiraddr_len )) == -1 ) {
 			perror("server accept");
@@ -130,7 +130,7 @@ int main(void) {
 		
 		if (fork() == 0) {
 			close(sockfd);
-			if (send(newfd, "Hello, World!", 13, 0) == 0)
+			if (send(newfd, "Hello, World!", 13, 0) == -1)
 				perror("server: send");
 			close(newfd);
 			exit(0);
