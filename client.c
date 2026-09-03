@@ -10,7 +10,7 @@
 #include <err.h>
 #include <errno.h>
 
-#define PORT "3490"
+#define PORT "3046"
 #define BUFSIZE 128
 
 void *get_in_addr(struct sockaddr *sa) {
