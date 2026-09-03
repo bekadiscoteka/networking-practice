@@ -13,7 +13,6 @@
 #define BACKLOG 10
 #define BUFSIZE 128
 
-
 void sigchld_handler(int s)
 {
     (void)s; // quiet unused variable warning
