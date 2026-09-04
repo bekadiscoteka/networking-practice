@@ -14,7 +14,7 @@ case $1 in
 		from="udp/talkto.c"
 		to="udp/listen.c"
 		frombin="bin/talkto"
-		tobin="bin/list"
+		tobin="bin/listen"
 		;;
 	*)
 		echo "choose the socket type"
@@ -24,7 +24,7 @@ case $1 in
 esac
 
 echo "building $to code..."
-gcc $to -o $tobin -g 2> err.log
+gcc $to -o $tobin 2> err.log
 if [ $? -gt 0 ]; then
 	echo "something went wrong, errlog:"
 	cat err.log
@@ -32,7 +32,7 @@ if [ $? -gt 0 ]; then
 fi
 
 echo "buliding $from code..."
-gcc $from -o $frombin -g 2> err.log
+gcc $from -o $frombin 2> err.log
 if [ $? -gt 0 ]; then
 	echo "something went wrong, errlog:"
 	cat err.log

@@ -20,7 +20,7 @@ void *get_in_addr(struct sockaddr *sa) {
 		errx(1, "get_in_addr()/undefined family");
 }
 
-int main(int argc, char argv[]) {
+int main(int argc, char *argv[]) {
 
 	if (argc != 3) {
 		errx(1, "argc=%d\nusage: talkto <hostname or ip> <msg>", argc);
@@ -30,13 +30,13 @@ int main(int argc, char argv[]) {
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_socktype	= SOCK_DGRAM;
 	hints.ai_family		= AF_INET;
-	int status			= getaddrinfo( "yermanbekzat-VirtualBox", PORT, &hints, &res );  
+	int status			= getaddrinfo( argv[1], PORT, &hints, &res );  
 	if (status > 0) 
 		errx(1, "%s", gai_strerror(status));
 	
 	struct addrinfo *p;
 	int sockfd;
-	for ( p = res; p != NULL; p->ai_next ) {
+	for ( p = res; p != NULL; p=p->ai_next ) {
 		sockfd = socket( p->ai_family, p->ai_socktype, p->ai_protocol );
 		if (sockfd == -1) {
 			perror("talker/socket");
@@ -52,7 +52,7 @@ int main(int argc, char argv[]) {
 	ssize_t nbytes;
 	if ( (nbytes=sendto(sockfd, argv[2], strlen(argv[2]), 0, p->ai_addr, p->ai_addrlen)) == -1 ) 
 		err(1, "talker/sendto()");
-	printf("talker successfully has sent %zd bytes to %s", nbytes, argv[1]);	
+	printf("talker successfully has sent %zd bytes to %s\n", nbytes, argv[1]);	
 	freeaddrinfo(res);
 	close(sockfd);
 
