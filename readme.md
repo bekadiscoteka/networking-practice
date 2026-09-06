@@ -1,2 +1,2 @@
 # why
-to practice **socket/networking programming** in C, and **shell scripting** as well
+to practice **socket/networking programming** in C, and **shell scripting** as well (maybe)
