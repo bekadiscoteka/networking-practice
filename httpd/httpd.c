@@ -9,11 +9,13 @@
 #include <err.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 
 /* defines */
-#define LOCALHOST "127.0.0.1"
-
+#define HOSTADDR "0.0.0.0"
+#define NOTFOUND_PATH "notfound.html"
+#define NOTALLOWED_PATH "notallowed.html"
 
 /* structures */
 struct sHttpParse {
@@ -22,6 +24,10 @@ struct sHttpParse {
 };
 
 typedef struct sHttpParse httpparse_t;
+
+/* global */
+int NOTFOUND;
+int NOTALLOWED;
 
 /* return parsed http on success, 0 on error */
 httpparse_t *http_parse(char *s) {
@@ -34,6 +40,7 @@ httpparse_t *http_parse(char *s) {
 		fprintf(stderr, "invalid HTTP format\n");	
 		return 0;
 	}
+	
 	
 	*p = '\0';
 	strcpy(hp->method, s);
@@ -50,23 +57,72 @@ httpparse_t *http_parse(char *s) {
 	return hp;
 }
 
+void http_status(int c, int status, char *sstatus) {
+	char buf[128];
+	sprintf(buf, "HTTP/1.1 %d %s\nServer: Little Brother\n", status, sstatus);
+	if (write(c, buf, strlen(buf)) == -1)
+		fprintf(stderr, "%s\n", "error on writing HTTP status response");
+	
+	return;
+}
 
-/* return 0 on success, -1 on fail */
+void http_content(int c, int hostresp) {
+	char buf[128];
+	ssize_t size;
+
+	sprintf(buf, "%s\n",
+		"Content-Type: text/html; charset=UTF-8\n" 
+		"Content-Length: 156\n"
+	);
+
+	size = strlen(buf);
+	do {
+		write(c, buf, size);
+	}
+	while ( (size=read(hostresp, buf, 128)) != EOF );
+	
+	return;
+}
+
+
+/* answers for GET responses */
 void cli_conn(int c) {
 	char buf[512];
-	if (-1 == read(c, buf, 511)) {
+	ssize_t rsize;
+	int hostresp;
+	if ( (rsize=read(c, buf, 512)) == -1) {
 		fprintf(stderr, "%s\n", strerror(errno));
 		return;
 	}
+
+	buf[rsize] = '\0';
 	
 	httpparse_t *p;
 	if ((p = http_parse(buf)) == NULL) 
 		return;
 
-	printf("Method: %s\nHost: %s\n", p->method, p->host);
+	//printf("Method: %s\nHost: %s\n", p->method, p->host);
+	
+	if (strcmp(p->method, "GET") == 0) {
+		char dir[128];
+		strcpy(dir, ".");
+		strcat(dir, p->host);
+		if ((hostresp=open(dir, O_RDONLY)) == -1) {
+			http_status(c, 404, "Not found");
+			http_content(c, NOTFOUND);
+		}
+		else {
+			http_status(c, 200, "OK");
+			http_content(c, hostresp);
+		}
+	} else {
+		http_status(c, 405, "Method Not Allowed");
+		http_content(c, NOTALLOWED);
+	}
 	
 	free(p);
 	close(c);
+	close(hostresp);
 	return;
 }
 
@@ -91,7 +147,7 @@ int init_srv(int portno, int backlog) {
 
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = inet_addr(LOCALHOST);
+	sa.sin_addr.s_addr = inet_addr(HOSTADDR);
 	sa.sin_port = htons(portno); 
 
 	if (bind(s, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
@@ -103,6 +159,14 @@ int init_srv(int portno, int backlog) {
 		close(s);
 		return -1;
 	}
+
+	NOTFOUND = open(NOTFOUND_PATH, O_RDONLY);
+	if (NOTFOUND == -1)
+		return -1;
+
+	NOTALLOWED = open(NOTALLOWED_PATH, O_RDONLY);
+	if (NOTALLOWED == -1) 
+		return -1;
 
 	return s;
 }
@@ -122,7 +186,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	
-	printf("server is listening on %s:%s\n", LOCALHOST, port);
+	printf("server is listening on %s:%s\n", HOSTADDR, port);
 
 	int c;
 	while (1) {
@@ -138,6 +202,10 @@ int main(int argc, char *argv[]) {
 			cli_conn(c);
 		
 	}
+
+	close(s);
+	close(NOTFOUND);
+	close(NOTALLOWED);
 
 	return 0;
 }
