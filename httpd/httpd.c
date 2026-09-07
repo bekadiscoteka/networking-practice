@@ -10,9 +10,63 @@
 #include <string.h>
 #include <unistd.h>
 
-#define LOCALHOST "127.0.0.0"
 
+/* defines */
+#define LOCALHOST "127.0.0.1"
+
+
+/* structures */
+struct sHttpParse {
+	char method[8];
+	char host[128];
+};
+
+typedef struct sHttpParse httpparse_t;
+
+/* return parsed http on success, 0 on error */
+httpparse_t *http_parse(char *s) {
+	httpparse_t *hp = malloc(sizeof(struct sHttpParse));
+	memset(hp, 0, sizeof(struct sHttpParse));
+	
+	char *p;
+	for (p=s; p != NULL && *p != ' '; p++);
+	if (p == NULL) {
+		fprintf(stderr, "invalid HTTP format\n");	
+		return 0;
+	}
+	
+	*p = '\0';
+	strcpy(hp->method, s);
+
+	for (++p, s=p; p != NULL && *p!=' '; p++);
+	if (p == NULL) {
+		fprintf(stderr, "invalid HTTP host format\n");
+		return 0;
+	}
+
+	*p = '\0';
+	strcpy(hp->host, s);
+
+	return hp;
+}
+
+
+/* return 0 on success, -1 on fail */
 void cli_conn(int c) {
+	char buf[512];
+	if (-1 == read(c, buf, 511)) {
+		fprintf(stderr, "%s\n", strerror(errno));
+		return;
+	}
+	
+	httpparse_t *p;
+	if ((p = http_parse(buf)) == NULL) 
+		return;
+
+	printf("Method: %s\nHost: %s\n", p->method, p->host);
+	
+	free(p);
+	close(c);
 	return;
 }
 
