@@ -10,12 +10,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 
 /* defines */
 #define HOSTADDR "0.0.0.0"
-#define NOTFOUND_PATH "notfound.html"
-#define NOTALLOWED_PATH "notallowed.html"
+#define PATH_404 "404.html"
+#define PATH_405 "405.html"
 
 /* structures */
 struct sHttpParse {
@@ -24,10 +25,6 @@ struct sHttpParse {
 };
 
 typedef struct sHttpParse httpparse_t;
-
-/* global */
-int NOTFOUND;
-int NOTALLOWED;
 
 /* return parsed http on success, 0 on error */
 httpparse_t *http_parse(char *s) {
@@ -66,20 +63,46 @@ void http_status(int c, int status, char *sstatus) {
 	return;
 }
 
-void http_content(int c, int hostresp) {
+void http_content(int c, int respf, long length) {
 	char buf[128];
 	ssize_t size;
 
-	sprintf(buf, "%s\n",
+	sprintf(buf, 
+		"%s%ld\n\n", 
 		"Content-Type: text/html; charset=UTF-8\n" 
-		"Content-Length: 156\n"
+		"Content-Length: ", 
+
+		length
 	);
 
 	size = strlen(buf);
 	do {
 		write(c, buf, size);
 	}
-	while ( (size=read(hostresp, buf, 128)) != EOF );
+	while ( (size=read(respf, buf, 128)) != EOF );
+	
+	return;
+}
+
+void http_resp(int c, int status, char msg[], char dir[]) {
+	struct stat st;
+	int pagef = open(dir, O_RDONLY);
+	if (pagef == -1) {
+		int notfoundf = open(PATH_404, O_RDONLY);
+		stat(PATH_404, &st);
+
+		http_status(c, 404, "Not Found");
+		http_content(c, notfoundf, st.st_size); 
+
+		close(notfoundf);
+	} else {
+		stat(dir, &st);
+		
+		http_status(c, status, msg);		
+		http_content(c, pagef, st.st_size);
+
+		close(pagef);
+	}
 	
 	return;
 }
@@ -87,42 +110,38 @@ void http_content(int c, int hostresp) {
 
 /* answers for GET responses */
 void cli_conn(int c) {
+
 	char buf[512];
 	ssize_t rsize;
-	int hostresp;
-	if ( (rsize=read(c, buf, 512)) == -1) {
-		fprintf(stderr, "%s\n", strerror(errno));
-		return;
-	}
-
-	buf[rsize] = '\0';
-	
 	httpparse_t *p;
-	if ((p = http_parse(buf)) == NULL) 
-		return;
 
-	//printf("Method: %s\nHost: %s\n", p->method, p->host);
-	
-	if (strcmp(p->method, "GET") == 0) {
-		char dir[128];
-		strcpy(dir, ".");
-		strcat(dir, p->host);
-		if ((hostresp=open(dir, O_RDONLY)) == -1) {
-			http_status(c, 404, "Not found");
-			http_content(c, NOTFOUND);
+	while (1) {
+
+		if ( (rsize=read(c, buf, 512)) == -1) {
+			fprintf(stderr, "%s\n", strerror(errno));
+			return;
 		}
-		else {
-			http_status(c, 200, "OK");
-			http_content(c, hostresp);
-		}
-	} else {
-		http_status(c, 405, "Method Not Allowed");
-		http_content(c, NOTALLOWED);
+
+		buf[rsize] = '\0';
+		
+		if ((p = http_parse(buf)) == NULL) 
+			return;
+
+		//printf("Method: %s\nHost: %s\n", p->method, p->host);
+		
+		if (strcmp(p->method, "GET") == 0) {
+			char dir[128];
+			strcpy(dir, ".");
+			strcat(dir, p->host);
+
+			http_resp(c, 200, "OK", dir);
+		} 
+		else 
+			http_resp(c, 405, "Method Not Allowed", PATH_405);
 	}
 	
 	free(p);
 	close(c);
-	close(hostresp);
 	return;
 }
 
@@ -160,14 +179,6 @@ int init_srv(int portno, int backlog) {
 		return -1;
 	}
 
-	NOTFOUND = open(NOTFOUND_PATH, O_RDONLY);
-	if (NOTFOUND == -1)
-		return -1;
-
-	NOTALLOWED = open(NOTALLOWED_PATH, O_RDONLY);
-	if (NOTALLOWED == -1) 
-		return -1;
-
 	return s;
 }
 
@@ -204,8 +215,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	close(s);
-	close(NOTFOUND);
-	close(NOTALLOWED);
 
 	return 0;
 }
